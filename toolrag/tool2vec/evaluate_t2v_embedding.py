@@ -11,6 +11,7 @@ import pickle
 
 from pathlib import Path
 
+
 argparser = argparse.ArgumentParser()
 argparser.add_argument(
     "--valid_data_path",
@@ -104,12 +105,12 @@ with open(t2v_embedding_path, "rb") as f:
 print("Data loaded")
 print("Valid/test data length:", len(valid_data))
 print("The number t2v embeddings:", len(t2v_embedding))
-
+# print(f"t2v_embedding {t2v_embedding[0]}")
 # idx to key
 idx_to_tool, tool_to_idx = {}, {}
 for idx, tool in enumerate(t2v_embedding):
+    embedding = t2v_embedding[tool]
     idx_to_tool[idx] = tool
-
     if tool not in tool_to_idx:
         tool_to_idx[tool] = idx
 

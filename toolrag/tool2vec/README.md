@@ -36,6 +36,13 @@ python embedding_generator.py \
     --use_checkpoint
 ```
 
+Example: python toolrag/tool2vec/embedding_generator.py \
+  --data_path NumpyBank_train.json \
+  --output_path output \
+  --output_file_name NumpyBank_embedded.json \
+  --model e5-small
+
+
 ## Model Evaluation
 ```
 VAL_DATA_PATH="...json"

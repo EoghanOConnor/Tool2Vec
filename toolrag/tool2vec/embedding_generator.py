@@ -27,7 +27,7 @@ import random
 import time
 from pathlib import Path
 from typing import Any, Callable, Collection, Optional, Type, TypeVar
-
+import pickle
 
 from openai import AzureOpenAI
 from tqdm import tqdm
@@ -37,11 +37,11 @@ from toolrag.models.mxbai import MxbaiModel
 
 Q = TypeVar("Q", bound=Callable[..., Any])
 
-client = AzureOpenAI(
-    azure_endpoint=os.environ["AZURE_ENDPOINT"],
-    api_key=os.environ["AZURE_OPENAI_API_KEY"],
-    api_version=os.environ["AZURE_OPENAI_API_VERSION"],
-)
+# client = AzureOpenAI(
+#     azure_endpoint=os.environ["AZURE_ENDPOINT"],
+#     api_key=os.environ["AZURE_OPENAI_API_KEY"],
+#     api_version=os.environ["AZURE_OPENAI_API_VERSION"],
+# )
 
 
 # define a retry decorator
@@ -103,12 +103,12 @@ def retry_with_exponential_backoff(
 def generate_embeddings(text, model="azure"):
     if model == "openai":
         raise NotImplementedError("OpenAI model not supported for embedding generation")
-    elif model == "azure":
-        return (
-            client.embeddings.create(input=[text], model="text-embedding-3-small")
-            .data[0]
-            .embedding
-        )
+    # elif model == "azure":
+    #     return (
+    #         client.embeddings.create(input=[text], model="text-embedding-3-small")
+    #         .data[0]
+    #         .embedding
+    #     )
     elif model == "e5-small" or model == "e5-base" or model == "e5-large":
         return e5_model.embed_queries([text]).squeeze(0).detach().cpu().tolist()
     elif model == "mxbai-large":
@@ -219,6 +219,7 @@ if __name__ == "__main__":
     output_file_name = args.output_file_name
     output_path = Path(args.output_path)
     output_data_path = output_path / output_file_name
+    pickle_output_data_path = str(output_path / output_file_name.replace(".json", ".pkl"))
 
     assert output_file_name.endswith(".json") or output_file_name.endswith(
         ".jsonl"
@@ -274,10 +275,63 @@ if __name__ == "__main__":
                 print("Saving data to", output_data_path)
                 with open(output_data_path, "w") as f:
                     json.dump(example_base_embedding_list, f, indent=4)
+    
+    # Dictionary to store function_name -> embedding
+    fixed_embeddings = {}
 
     # Final save
     print("Saving data to", output_data_path)
     with open(output_data_path, "w") as f:
         json.dump(example_base_embedding_list, f, indent=4)
+    for entry in example_base_embedding_list:
+        functions = entry.get("functions", [])
+        embedding = entry.get("function_embedding")
+        print(f"num of examples {len(example_base_embedding_list)}")
+        for fn in functions:
+            # Overwrite or assign — assume each function is a unique entry
+            # if fn not in fixed_embeddings:
+            fixed_embeddings[fn] = embedding
+    print(f"fixed_embeddings {fixed_embeddings}")
+
+    print(f"Converted {len(fixed_embeddings)} tools.")
+
+    # Save the fixed dict-based version
+    with open("output/function_descriptions_embeddings_tempt.pkl", "wb") as f:
+        pickle.dump(fixed_embeddings, f)
+
+    print("Saved: output/function_descriptions_embeddings_tempt.pkl")
+
+
+    # if pickle_output_data_path.endswith(".pkl"):
+    #     print("Saving data to", pickle_output_data_path)
+    #     with open(pickle_output_data_path, "wb") as f:
+    #         pickle.dump(example_base_embedding_list, f)
+    # else:
+    #     with open(output_data_path, "w") as f:
+    #         json.dump(example_base_embedding_list, f, indent=2)
+    #     # Load your current, incorrectly formatted pkl
+    # with open(pickle_output_data_path, "rb") as f:
+    #     bad_embeddings = pickle.load(f)
+
+    # # Fix it: extract function name and corresponding embedding
+    # fixed_embeddings = {}
+
+    # for entry in bad_embeddings:
+    #     functions = entry.get("functions", [])
+    #     embedding = entry.get("function_embedding")
+
+    #     for fn in functions:
+    #         # If multiple entries reference same function, only keep the first
+    #         if fn not in fixed_embeddings:
+    #             fixed_embeddings[fn] = embedding
+
+    # print(f" Converted {len(fixed_embeddings)} tools.")
+
+    # # Save the fixed version
+    # with open(pickle_output_data_path, "wb") as f:
+    #     pickle.dump(fixed_embeddings, f)
+
+    # print(f" Saved: {pickle_output_data_path}")
+
 
     os.chmod(output_data_path, 0o777)
